@@ -32,8 +32,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-class __non_copyable {
-	__non_copyable(const __non_copyable&);
+template <class T>
+class __non_copyable_but {
+	friend T;
+
+	__non_copyable_but(const __non_copyable_but<T>&) = default;
+	__non_copyable_but(__non_copyable_but<T>&&) = default;
+	__non_copyable_but& operator=(const __non_copyable_but<T>&) = default;
+	__non_copyable_but& operator=(__non_copyable_but<T>&&) = default;
 };
 
 #define __safe_offsetof(type, member) ((size_t)(std::addressof(((type*)0)->member)))
@@ -42,40 +48,47 @@ class __non_copyable {
 
 #define __PROPERTY_GET_ADDRESS_OF(__prop_name) (std::intptr_t)(this) - __safe_offsetof(__this_class_type, __prop_name)
 
-#define __PROPERTY_GET_IMPL(__prop_type, __prop_name)                                                   \
-			__prop_type get() const {                                                                   \
+#define __PROPERTY_GET_IMPL(__prop_name)                                                                \
+			prop_type get() const {                                                                     \
 				auto address = __PROPERTY_GET_ADDRESS_OF(__prop_name);                                  \
 				return reinterpret_cast<__this_class_type*>(address)->__property_##__prop_name##_get(); \
 			}                                                                                           \
-			operator __prop_type() const { return this->get(); }
+			operator prop_type() const { return this->get(); }
 
-#define __PROPERTY_SET_IMPL(__prop_type, __prop_name)                                                 \
-			void set(const __prop_type& value) {                                                      \
+#define __PROPERTY_SET_IMPL(__prop_name)                                                              \
+			void set(const prop_type& value) {                                                        \
 				auto address = __PROPERTY_GET_ADDRESS_OF(__prop_name);                                \
 				reinterpret_cast<__this_class_type*>(address)->__property_##__prop_name##_set(value); \
 			}                                                                                         \
-			void operator=(const __prop_type& value) { this->set(value); }
+			void operator=(const prop_type& value) { this->set(value); }
 
-#define __PROPERTY_DEFAULT_IMPL(__prop_type, __prop_name, __get_impl, __set_impl)          \
-	};                                                                                     \
-	struct __PROPERTY_MAKE_NAME(__prop_type, __prop_name) {                                \
-		using prop_type = __prop_type;                                                     \
-		using this_type = __PROPERTY_MAKE_NAME(__prop_type, __prop_name);                  \
-		__PROPERTY_MAKE_NAME(__prop_type, __prop_name)() = default;                        \
-		__PROPERTY_MAKE_NAME(__prop_type, __prop_name)(const __prop_type& T) : value(T) {} \
-		this_type& operator=(const this_type&) = delete;                                   \
-		this_type& operator=(this_type&&) = delete;                                        \
-		__get_impl                                                                         \
-		__set_impl                                                                         \
-	private:                                                                               \
-		__prop_type value;                                                                 \
-	};                                                                                     \
-	union {                                                                                \
+#define __PROPERTY_DEFAULT_IMPL(__prop_type, __prop_name, __get_impl, __set_impl)        \
+	};                                                                                   \
+	struct __PROPERTY_MAKE_NAME(__prop_type, __prop_name) {                              \
+		using prop_type = __prop_type;                                                   \
+		using this_type = __PROPERTY_MAKE_NAME(__prop_type, __prop_name);                \
+		__PROPERTY_MAKE_NAME(__prop_type, __prop_name)() = default;                      \
+		__PROPERTY_MAKE_NAME(__prop_type, __prop_name)(const this_type&) = default;      \
+		__PROPERTY_MAKE_NAME(__prop_type, __prop_name)(const prop_type& T) : value(T) {} \
+		this_type& operator=(const this_type&) = delete;                                 \
+		this_type& operator=(this_type&&) = delete;                                      \
+		__get_impl                                                                       \
+		__set_impl                                                                       \
+	private:                                                                             \
+		prop_type value;                                                                 \
+	};                                                                                   \
+	union {                                                                              \
 		__PROPERTY_MAKE_NAME(__prop_type, __prop_name) __prop_name
 
-#define __PROPERTY_DEFAULT_GET_IMPL(__prop_type) operator __prop_type() const { return value; }
+#define __PROPERTY_DEFAULT_GET_IMPL                    \
+	operator prop_type() const { return value; }       \
+	const prop_type& get_ref() const { return value; } \
+	prop_type& get_ref() { return value; }             \
+	prop_type get() const { return value; }
 
-#define __PROPERTY_DEFAULT_SET_IMPL(__prop_type) void operator=(const __prop_type& value) { this->value = value; }
+#define __PROPERTY_DEFAULT_SET_IMPL                                 \
+	void operator=(const prop_type& value) { this->value = value; } \
+	void set(const prop_type& value) { this->value = value; }
 
 #define PROPERTY_INIT(__class_name)                          \
 	using __this_class_type = __class_name;                  \
@@ -84,37 +97,37 @@ class __non_copyable {
 
 #define PROPERTY union
 
-#define PROPERTY_GET(__prop_type, __prop_name)            \
-		struct : __non_copyable {                         \
-			using prop_type = __prop_type;                \
-			__PROPERTY_GET_IMPL(__prop_type, __prop_name) \
+#define PROPERTY_GET(__prop_type, __prop_name)                  \
+		struct : public __non_copyable_but<__this_class_type> { \
+			using prop_type = __prop_type;                      \
+			__PROPERTY_GET_IMPL(__prop_name)                    \
 		} __prop_name
 
-#define PROPERTY_SET(__prop_type, __prop_name)            \
-		struct : __non_copyable {                         \
-			using prop_type = __prop_type;                \
-			__PROPERTY_SET_IMPL(__prop_type, __prop_name) \
+#define PROPERTY_SET(__prop_type, __prop_name)                  \
+		struct : public __non_copyable_but<__this_class_type> { \
+			using prop_type = __prop_type;                      \
+			__PROPERTY_SET_IMPL(__prop_name)                    \
 		} __prop_name
 
-#define PROPERTY_GET_SET(__prop_type, __prop_name)        \
-		struct : __non_copyable {                         \
-			using prop_type = __prop_type;                \
-			__PROPERTY_GET_IMPL(__prop_type, __prop_name) \
-			__PROPERTY_SET_IMPL(__prop_type, __prop_name) \
+#define PROPERTY_GET_SET(__prop_type, __prop_name)              \
+		struct : public __non_copyable_but<__this_class_type> { \
+			using prop_type = __prop_type;                      \
+			__PROPERTY_GET_IMPL(__prop_name)                    \
+			__PROPERTY_SET_IMPL(__prop_name)                    \
 		} __prop_name
 
 #define PROPERTY_DEFAULT_GET(__prop_type, __prop_name) \
 	__PROPERTY_DEFAULT_IMPL(__prop_type, __prop_name,  \
-		__PROPERTY_DEFAULT_GET_IMPL(__prop_type),)
+		__PROPERTY_DEFAULT_GET_IMPL,)
 
 #define PROPERTY_DEFAULT_SET(__prop_type, __prop_name) \
 	__PROPERTY_DEFAULT_IMPL(__prop_type, __prop_name,, \
-		__PROPERTY_DEFAULT_SET_IMPL(__prop_type))
+		__PROPERTY_DEFAULT_SET_IMPL)
 
 #define PROPERTY_DEFAULT_GET_SET(__prop_type, __prop_name) \
 	__PROPERTY_DEFAULT_IMPL(__prop_type, __prop_name,      \
-		__PROPERTY_DEFAULT_GET_IMPL(__prop_type),          \
-		__PROPERTY_DEFAULT_SET_IMPL(__prop_type))
+		__PROPERTY_DEFAULT_GET_IMPL,                       \
+		__PROPERTY_DEFAULT_SET_IMPL)
 
 #define GET(__prop_name) \
 	decltype(__prop_name)::prop_type __property_##__prop_name##_get() const
