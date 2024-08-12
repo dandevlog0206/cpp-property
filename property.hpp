@@ -129,14 +129,14 @@ class __non_copyable_but {
 		__PROPERTY_DEFAULT_GET_IMPL,                       \
 		__PROPERTY_DEFAULT_SET_IMPL)
 
-#define GET(__prop_name) \
+#define PROPERTY_DECL_GET(__prop_name) \
 	decltype(__prop_name)::prop_type __property_##__prop_name##_get() const
 
-#define SET(__prop_name) \
+#define PROPERTY_DECL_SET(__prop_name) \
 	void __property_##__prop_name##_set(const decltype(__prop_name)::prop_type& value)
 
-#define GET_IMPL(__class_name, __prop_name) \
+#define PROPERTY_IMPL_GET(__class_name, __prop_name) \
 	decltype(__class_name::__prop_name)::prop_type __class_name::__property_##__prop_name##_get() const
 
-#define SET_IMPL(__class_name, __prop_name) \
+#define PROPERTY_IMPL_SET(__class_name, __prop_name) \
 	void __class_name::__property_##__prop_name##_set(const decltype(__class_name::__prop_name)::prop_type& value)
