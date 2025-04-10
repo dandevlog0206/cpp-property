@@ -1,125 +1,176 @@
-/*************************************************************************/
-/* demo.cpp                                                              */
-/*************************************************************************/
-/* https://www.dandevlog.com/all/programming/1347/                       */
-/* https://github.com/dandevlog0206/cpp-property                         */
-/*************************************************************************/
-/* Copyright (c) 2024 www.dandevlog.com                                  */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
-
 #include <iostream>
-#include <string>
-#include <util/property.hpp>
+#include <vector>
+#include <chrono>
+#include "property.h"
+
+#define BENCHMARK_N 1000000
 
 using namespace std;
 
-class MyClass {
-	PROPERTY_INIT(MyClass);
-
-public:
-	MyClass() :
-		prop_default_int1(20) // Auto implemented property can be initialized by member-initializer
-	{
-		// Normal properties can be initialized by initializing in constructor
-		int_member    = 1;
-		float_member  = 3.14;
-		string_member = "hello";
-	}
-
-public:
-	PROPERTY {
-		PROPERTY_DEFAULT_GET(int, prop_default_int0) = 10; // Auto implemented property only with Getter
-		PROPERTY_DEFAULT_SET(int, prop_default_int1);      // Auto implemented property only with Setter
-		PROPERTY_DEFAULT_GET_SET(int, prop_default_int2);  // Auto implemented property with Getter/Setter
-	};
-
-	PROPERTY {
-		PROPERTY_GET(int, prop_int);           // Property only with Getter
-		PROPERTY_SET(float, prop_float);       // Property only with Setter
-		PROPERTY_GET_SET(string, prop_string); // Property with Getter/Setter
-	};
-
-private:
-	GET(prop_int) {
-		return int_member;
-	}
-
-	SET(prop_float) {
-		float_member = min(max(value, 0.f), 10.f);
-	}
-
-	GET(prop_string); // Declare Getter/Setter of prop_string property
-	SET(prop_string);
-
-private:
-	int         int_member;
-	float       float_member;
-	std::string string_member;
+struct vec2 {
+	float x, y;
 };
 
-GET_IMPL(MyClass, prop_string) {
-	cout << "someone got string message!\n";
-	return string_member;
+vec2 operator+(const vec2& lhs, const vec2& rhs) {
+	return { lhs.x + rhs.x, lhs.y + rhs.y };
 }
 
-SET_IMPL(MyClass, prop_string) {
-	cout << "someone set string message!\n";
-	cout << "from : " << string_member << endl;
-	cout << "to   : " << value << endl;
-	string_member = value;
+ostream& operator<<(ostream& os, const vec2& v) {
+	os << "[" << v.x << ", " << v.y << "]";
+	return os;
+}
+
+ostream& operator<<(ostream& os, const vector<int>& v) {
+	os << "[ " << v[0];
+	for (size_t i = 1; i < v.size(); ++i)
+		os << ", " << v[i];
+	os << " ]"; 
+	return os;
+}
+
+class MyClass {
+	PROPERTY_INIT(MyClass);
+	
+public:
+	MyClass() :
+		Float0(2.f),
+		m_num_list({ 1, 2, 3 ,4 ,5 }),
+		m_float0(1.f),
+		m_vector0({ 1, 2 })
+	{
+		Float0 = 3.f;
+
+		Float1 = 3.f; // readonly property can be written by the owner
+		float dummy = Float2; // writeonly property can be read by the owner
+	}
+
+	// property members don't use any memory space => *zero* abstraction cost in memory
+	// property and getter
+	PROPERTY(vector<int>, NumberList);
+	PROPERTY(vec2, BenchVector);
+	PROPERTY(vec2, Vector0);
+	PROPERTY(float, Float0);
+	PROPERTY(float, Float1, readonly);  // new attribute readonly
+	PROPERTY(float, Float2, writeonly); // new attribute writeonly
+	
+	PROPERTY(float, Float3, default); // new attribute default, Float2 behaves almost same as float Float2
+	PROPERTY(float, Float4, default, readonly); // mix two attributes
+	PROPERTY(float, Float5, default, writeonly);
+	PROPERTY(float, Float6, readonly, default); // attribute order is not matter 
+
+private:
+	PROPERTY_GET_DECL(NumberList) {
+		return m_num_list;
+	}
+
+	PROPERTY_SET_DECL(NumberList) {
+		m_num_list = value;
+	}
+
+	PROPERTY_GET_DECL(BenchVector) {
+		return m_bench_vector;
+	}
+
+	PROPERTY_SET_DECL(BenchVector) {
+		m_bench_vector = value;
+	}
+
+	PROPERTY_GET_DECL(Vector0); // separate declaration and implementation
+	PROPERTY_SET_DECL(Vector0);
+
+	PROPERTY_GET_DECL(Float0) { // declare and implement at the same time
+		cout << "get Float0: " << m_float0 << endl;
+		return m_float0;
+	}
+	
+	PROPERTY_SET_DECL(Float0) {
+		cout << "set Float0: " << (m_float0 = value) << endl;
+	}
+
+	PROPERTY_GET_DECL(Float1) {
+		cout << "get Float1: " << m_float1 << endl;
+		return m_float1;
+	}
+
+	PROPERTY_SET_DECL(Float1) {
+		cout << "set Float1: " << (m_float1 = value) << endl;
+	}
+
+	PROPERTY_GET_DECL(Float2) {
+		cout << "get Float2: " << m_float2 << endl;
+		return m_float2;
+	}
+
+	PROPERTY_SET_DECL(Float2) {
+		cout << "set Float2: " << (m_float2 = value) << endl;
+	}
+
+private:
+	vector<int> m_num_list;
+	vec2 m_bench_vector;
+	float m_float0;
+	float m_float1;
+	float m_float2;
+	vec2 m_vector0; 
+};
+
+PROPERTY_GET_IMPL(MyClass, Vector0) {
+	cout << "get Vector0: " << m_vector0 << endl;
+	return m_vector0;
+}
+
+PROPERTY_SET_IMPL(MyClass, Vector0) {
+	cout << "set Vector0: " << (m_vector0 = value) << endl;
 }
 
 int main() {
-	MyClass inst;
+	float dummy;
+	(void)dummy;
+ 
+	MyClass cls;
 
-	int int0 = inst.prop_default_int0;
-	// int int1 = inst.prop_default_int1; Error, write-only property
-	int int2 = inst.prop_default_int2;
+	cout << sizeof(cls) << endl;
+	cout << cls.NumberList << endl; // expect [ 1, 2, 3, 4, 5 ]
+	cls.NumberList->push_back(6);   // access to member(requires both get and set)
+	cout << cls.NumberList << endl; // expect [ 1, 2, 3, 4, 5, 6 ]
 
-	// inst.prop_default_int0 = 100; Error, read-only property
-	inst.prop_default_int1 = 100;
-	inst.prop_default_int2 = 100;
+	dummy = cls.Float0.get(); // read1
+	dummy = cls.Float0();     // read2
+	dummy = cls.Float0;       // read3
 
-	int int_value = inst.prop_int;
-	// inst.prop_int = 100; Error, read-only property
-	
-	// float float_value = inst.prop_float; Error
-	inst.prop_float = 100.f; 
+	cls.Float0.set(1.f); // write1 (less abstracted)
+	cls.Float0(2.f);     // write2
+	cls.Float0 = 3.f;    // write3 (most abstracted)
 
-	string string_value = inst.prop_string;
-	inst.prop_string = "Hello World!";
-	cout << inst.prop_string.get() << endl;
-	cout << ((string)inst.prop_string).front() << endl; // Can be acessed after casting(but, copied instance)
-	
-	/* Warnings(use inst.prop_string.get() instead)
+	cout << cls.Vector0 + vec2{ 3, 4 } << endl; // automatic casting
+	cls.Vector0->x += 1.f; // read and write member variable 
 
-	1. cout << inst.prop_string << endl; Error
+	// Simple Benchmark (low abstraction cost at speed in -O3 optimization)
+	{
+		vec2 BenchVector = { 0.f, 0.f };
 
-	2. auto string_value = inst.prop_string; Error
+		auto begin = chrono::high_resolution_clock::now();
+		
+		for (volatile int i = 0; i < BENCHMARK_N; ++i)
+			BenchVector.x += i;
 
-	3. for (char ch : inst.prop_string) Error
-	       cout << ch;
-	*/
+		auto end = chrono::high_resolution_clock::now();
 
+		auto us = chrono::duration_cast<chrono::microseconds>(end - begin).count();
+		cout << "benchmark with normal access(no abstract): " << us / 1e3f << "ms\n"; // about 0.46ms 
+	}
+
+	{
+		auto begin = chrono::high_resolution_clock::now();
+		
+		for (volatile int i = 0; i < BENCHMARK_N; ++i)
+			cls.BenchVector->x += i;
+
+		auto end = chrono::high_resolution_clock::now();
+
+		auto us = chrono::duration_cast<chrono::microseconds>(end - begin).count();
+		cout << "benchmark with access by property: " << us / 1e3f << "ms\n"; // about 0.68ms 
+	}
 
 	return 0;
 }

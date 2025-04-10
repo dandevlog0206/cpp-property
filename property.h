@@ -205,12 +205,15 @@ __NO_UNIQUE_ADRESS struct __property##__prop_name { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
 		reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_set(value); \
 	} \
-	void operator()(const value_type& value) { set(value); }\
-	void operator=(const value_type& value) { set(value); }\
+	void operator()(const value_type& value) { set(value); } \
+	void operator=(const value_type& value) { set(value); } \
 } __prop_name
 
 #define __PROPERTY_IMPL_readonly(__prop_type, __prop_name) \
 __NO_UNIQUE_ADRESS struct __property##__prop_name { \
+	friend __this_class_type; \
+	template <class Type2, class Property> \
+	friend class ::priv::ClassProxy; \
 	using value_type = __prop_type; \
 	using this_type = __property##__prop_name; \
 	__property##__prop_name() = default; \
@@ -223,12 +226,24 @@ __NO_UNIQUE_ADRESS struct __property##__prop_name { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
 		return reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_get(); \
 	} \
-	value_type operator()() const { return get(); }\
-	operator value_type() const { return get(); }\
+	value_type operator()() const { return get(); } \
+	operator value_type() const { return get(); } \
+private:\
+	template <class Type = value_type, std::enable_if_t<std::is_class_v<Type>, int> = 0> \
+	auto operator->() { \
+		return ::priv::ClassProxy<decltype(*this), value_type>(get(), *this); \
+	} \
+	void set(const value_type& value) { \
+		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
+		reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_set(value); \
+	} \
+	void operator()(const value_type& value) { set(value); }\
+	void operator=(const value_type& value) { set(value); } \
 } __prop_name
 
 #define __PROPERTY_IMPL_writeonly(__prop_type, __prop_name) \
 __NO_UNIQUE_ADRESS struct __property##__prop_name { \
+	friend __this_class_type; \
 	using value_type = __prop_type; \
 	using this_type = __property##__prop_name; \
 	__property##__prop_name() = default; \
@@ -237,13 +252,24 @@ __NO_UNIQUE_ADRESS struct __property##__prop_name { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
 		reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_set(value); \
 	} \
-	void operator()(const value_type& value) { set(value); }\
-	void operator=(const value_type& value) { set(value); }\
+	void operator()(const value_type& value) { set(value); } \
+	void operator=(const value_type& value) { set(value); } \
+private:\
+	template <class Type = value_type, std::enable_if_t<std::is_class_v<Type>, int> = 0> \
+	auto operator->() { \
+		return ::priv::ClassProxy<decltype(*this), value_type>(get(), *this); \
+	} \
+	value_type get() const { \
+		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
+		return reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_get(); \
+	} \
+	value_type operator()() const { return get(); } \
+	operator value_type() const { return get(); } \
 } __prop_name
 
 #define __PROPERTY_IMPL_default(__prop_type, __prop_name) ::priv::Proxy<__prop_type> __prop_name
 #define __PROPERTY_IMPL_defaultreadonly(__prop_type, __prop_name) ::priv::Proxy_readonly<__prop_type, __this_class_type> __prop_name
-#define __PROPERTY_IMPL_defaultwriteonly(__prop_type, __prop_name) ::priv::Proxy_writeonly<__prop_type> __prop_name
+#define __PROPERTY_IMPL_defaultwriteonly(__prop_type, __prop_name) ::priv::Proxy_writeonly<__prop_type, __this_class_type> __prop_name
 #define __PROPERTY_IMPL_readonlydefault(__prop_type, __prop_name) __PROPERTY_IMPL_defaultreadonly(__prop_type, __prop_name)
 #define __PROPERTY_IMPL_writeonlydefault(__prop_type, __prop_name) __PROPERTY_IMPL_defaultwriteonly(__prop_type, __prop_name)
 
