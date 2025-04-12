@@ -40,8 +40,12 @@ public:
 	{
 		Float0 = 3.f;
 
-		Float1 = 3.f; // readonly property can be written by the owner
-		float dummy = Float2; // writeonly property can be read by the owner
+		// float dummy = Float2;
+
+		// Float1 = 3.f; // readonly property can be written by the owner(same to writeonly property)
+
+		// you can omit declaring getter for writeonly property(same to readonly property)
+		// float dummy = Float2; *error*
 	}
 
 	// property members don't use any memory space => *zero* abstraction cost in memory
@@ -53,7 +57,7 @@ public:
 	PROPERTY(float, Float1, readonly);  // new attribute readonly
 	PROPERTY(float, Float2, writeonly); // new attribute writeonly
 	
-	PROPERTY(float, Float3, default); // new attribute default, Float2 behaves almost same as float Float2
+	PROPERTY(float, Float3, default); // new attribute default, Float3 behaves almost same as float
 	PROPERTY(float, Float4, default, readonly); // mix two attributes
 	PROPERTY(float, Float5, default, writeonly);
 	PROPERTY(float, Float6, readonly, default); // attribute order is not matter 
@@ -75,6 +79,7 @@ private:
 		m_bench_vector = value;
 	}
 
+	// or you can use PROPERTY_GET_SET_DECL(Vector0); instead of below two lines
 	PROPERTY_GET_DECL(Vector0); // separate declaration and implementation
 	PROPERTY_SET_DECL(Vector0);
 
@@ -96,10 +101,11 @@ private:
 		cout << "set Float1: " << (m_float1 = value) << endl;
 	}
 
-	PROPERTY_GET_DECL(Float2) {
-		cout << "get Float2: " << m_float2 << endl;
-		return m_float2;
-	}
+	// getter is optional to writeonly property
+	// PROPERTY_GET_DECL(Float2) {
+	// 	cout << "get Float2: " << m_float2 << endl;
+	// 	return m_float2;
+	// }
 
 	PROPERTY_SET_DECL(Float2) {
 		cout << "set Float2: " << (m_float2 = value) << endl;
@@ -157,7 +163,7 @@ int main() {
 		auto end = chrono::high_resolution_clock::now();
 
 		auto us = chrono::duration_cast<chrono::microseconds>(end - begin).count();
-		cout << "benchmark with normal access(no abstract): " << us / 1e3f << "ms\n"; // about 0.46ms 
+		cout << "benchmark: normal access(no abstraction): " << us / 1e3f << "ms\n"; // about 0.46ms 
 	}
 
 	{
@@ -169,7 +175,7 @@ int main() {
 		auto end = chrono::high_resolution_clock::now();
 
 		auto us = chrono::duration_cast<chrono::microseconds>(end - begin).count();
-		cout << "benchmark with access by property: " << us / 1e3f << "ms\n"; // about 0.68ms 
+		cout << "benchmark: access by property: " << us / 1e3f << "ms\n"; // about 0.68ms 
 	}
 
 	return 0;

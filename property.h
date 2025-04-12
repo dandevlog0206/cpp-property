@@ -44,8 +44,9 @@ namespace priv {
 			Type(std::forward<Init>(value)), m_parent(parent) {}
 		
 		constexpr ~ClassProxy() { m_parent.set(*this); }
+
 		constexpr auto operator->() { return this; }
-		
+
 	private:
 		Property& m_parent;
 	};
@@ -93,6 +94,10 @@ namespace priv {
 		constexpr void operator=(const Type& value) { m_value = value; }
 		constexpr void operator=(Type&& value) { m_value = std::move(value); }
 
+		constepxr const Type& cref() const { return m_value; }
+		constexpr const Type& ref() const { return m_value; }
+		constexpr Type& ref() { return m_value; }
+
 	private:
 		Type m_value;
 	};
@@ -123,18 +128,23 @@ namespace priv {
 		constexpr Type operator()() const { return m_value; }
 		constexpr operator Type() const { return m_value; }
 
+		constepxr const Type& cref() const { return m_value; }
+		constexpr const Type& ref() const { return m_value; }
+		
 	private:
 		template <class Type2 = value_type, std::enable_if_t<std::is_class_v<Type2>, int> = 0>
 		auto operator->() {
 			return ::priv::ClassProxy<Proxy_readonly, value_type>(get(), *this);
 		}
-
+		
 		constexpr void set(const Type& value) { m_value = value; }
 		constexpr void set(Type&& value) { m_value = std::move(value); }
 		constexpr void operator()(const Type& value) { m_value = value; }
 		constexpr void operator()(Type&& value) { m_value = std::move(value); }
 		constexpr void operator=(const Type& value) { m_value = value; }
 		constexpr void operator=(Type&& value) { m_value = std::move(value); }
+		
+		constexpr Type& ref() { return m_value; }
 
 	private:
 		Type m_value;
@@ -167,6 +177,10 @@ namespace priv {
 		constexpr Type operator()() const { return m_value; }
 		constexpr operator Type() const { return m_value; }
 
+		constepxr const Type& cref() const { return m_value; }
+		constexpr const Type& ref() const { return m_value; }
+		constexpr Type& ref() { return m_value; }
+
 	private:
 		Type m_value;
 	};
@@ -184,47 +198,57 @@ namespace priv {
 #define __safe_offsetof(type, member) ((size_t)(std::addressof(((type*)0)->member)))
 #define __PROPERTY_GET_ADDRESS_OF(__prop_name) (std::intptr_t)(this) - __safe_offsetof(__this_class_type, __prop_name)
 
+#define __PROPERTY_REQUIRES_GETTER \
+	template <class Class = __this_class_type>
+// 	template <class Class = __this_class_type, class Property = this_type, std::enable_if_t<priv::has_get<Class, Property>::type::value, int> = 0>
+// 
+#define __PROPERTY_REQUIRES_SETTER \
+	template <class Class = __this_class_type>
+// 	template <class Class = __this_class_type, class Property = this_type, std::enable_if_t<priv::has_set<Class, Property>::type::value, int> = 0>
+
 #define __PROPERTY_IMPL_(__prop_type, __prop_name) \
-__NO_UNIQUE_ADRESS struct __property##__prop_name { \
+__NO_UNIQUE_ADRESS struct __property_##__prop_name { \
 	using value_type = __prop_type; \
-	using this_type = __property##__prop_name; \
-	__property##__prop_name() = default; \
-	__property##__prop_name(const this_type&) = delete; \
-	__property##__prop_name(const value_type& init) { set(init); } \
+	using this_type = __property_##__prop_name; \
+	struct type_tag {}; \
+	__property_##__prop_name() = default; \
+	__property_##__prop_name(const this_type&) = delete; \
+	__property_##__prop_name(const value_type& init) { set(init); } \
 	template <class Type = value_type, std::enable_if_t<std::is_class_v<Type>, int> = 0> \
 	auto operator->() { \
 		return ::priv::ClassProxy<decltype(*this), value_type>(get(), *this); \
 	} \
 	value_type get() const { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
-		return reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_get(); \
+		return reinterpret_cast<__this_class_type*>(_this)->__property_get(type_tag{}); \
 	} \
 	value_type operator()() const { return get(); }\
 	operator value_type() const { return get(); }\
 	void set(const value_type& value) { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
-		reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_set(value); \
+		reinterpret_cast<__this_class_type*>(_this)->__property_set(type_tag{}, value); \
 	} \
 	void operator()(const value_type& value) { set(value); } \
 	void operator=(const value_type& value) { set(value); } \
 } __prop_name
 
 #define __PROPERTY_IMPL_readonly(__prop_type, __prop_name) \
-__NO_UNIQUE_ADRESS struct __property##__prop_name { \
+__NO_UNIQUE_ADRESS struct __property_##__prop_name { \
 	friend __this_class_type; \
 	template <class Type2, class Property> \
 	friend class ::priv::ClassProxy; \
 	using value_type = __prop_type; \
-	using this_type = __property##__prop_name; \
-	__property##__prop_name() = default; \
-	__property##__prop_name(const this_type&) = delete; \
+	using this_type = __property_##__prop_name; \
+	struct type_tag {}; \
+	__property_##__prop_name() = default; \
+	__property_##__prop_name(const this_type&) = delete; \
 	template <class Type = value_type, std::enable_if_t<std::is_class_v<Type>, int> = 0> \
 	auto operator->() const { \
 		return ::priv::ClassProxy_readonly<value_type>(get()); \
 	} \
 	value_type get() const { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
-		return reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_get(); \
+		return reinterpret_cast<__this_class_type*>(_this)->__property_get(type_tag{}); \
 	} \
 	value_type operator()() const { return get(); } \
 	operator value_type() const { return get(); } \
@@ -233,24 +257,28 @@ private:\
 	auto operator->() { \
 		return ::priv::ClassProxy<decltype(*this), value_type>(get(), *this); \
 	} \
+	__PROPERTY_REQUIRES_SETTER \
 	void set(const value_type& value) { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
-		reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_set(value); \
+		reinterpret_cast<Class*>(_this)->__property_set(type_tag{}, value); \
 	} \
+	__PROPERTY_REQUIRES_SETTER \
 	void operator()(const value_type& value) { set(value); }\
-	void operator=(const value_type& value) { set(value); } \
+	__PROPERTY_REQUIRES_SETTER \
+	 void operator=(const value_type& value) { set(value); } \
 } __prop_name
 
 #define __PROPERTY_IMPL_writeonly(__prop_type, __prop_name) \
-__NO_UNIQUE_ADRESS struct __property##__prop_name { \
+__NO_UNIQUE_ADRESS struct __property_##__prop_name { \
 	friend __this_class_type; \
 	using value_type = __prop_type; \
-	using this_type = __property##__prop_name; \
-	__property##__prop_name() = default; \
-	__property##__prop_name(const this_type&) = delete; \
+	using this_type = __property_##__prop_name; \
+	struct type_tag {}; \
+	__property_##__prop_name() = default; \
+	__property_##__prop_name(const this_type&) = delete; \
 	void set(const value_type& value) { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
-		reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_set(value); \
+		reinterpret_cast<__this_class_type*>(_this)->__property_set(type_tag{}, value); \
 	} \
 	void operator()(const value_type& value) { set(value); } \
 	void operator=(const value_type& value) { set(value); } \
@@ -259,11 +287,14 @@ private:\
 	auto operator->() { \
 		return ::priv::ClassProxy<decltype(*this), value_type>(get(), *this); \
 	} \
+	__PROPERTY_REQUIRES_GETTER \
 	value_type get() const { \
 		auto _this = __PROPERTY_GET_ADDRESS_OF(__prop_name); \
-		return reinterpret_cast<__this_class_type*>(_this)->__property_##__prop_name##_get(); \
+		return reinterpret_cast<Class*>(_this)->__property_get(type_tag{}); \
 	} \
+	__PROPERTY_REQUIRES_GETTER \
 	value_type operator()() const { return get(); } \
+	__PROPERTY_REQUIRES_GETTER \
 	operator value_type() const { return get(); } \
 } __prop_name
 
@@ -281,13 +312,21 @@ private:\
 #define PROPERTY(type, __prop_name, ...) __CALL_PROPERTY(type, __prop_name, __VA_ARGS__)
 
 #define PROPERTY_GET_DECL(__prop_name) \
-	decltype(__prop_name)::value_type __property_##__prop_name##_get() const
+	using __property_has_get_##__prop_name = int; \
+	decltype(__prop_name)::value_type __property_get(__property_##__prop_name::type_tag) const
 
 #define PROPERTY_SET_DECL(__prop_name) \
-	void __property_##__prop_name##_set(const decltype(__prop_name)::value_type& value)
+	using __property_has_set_##__prop_name = int; \
+	void __property_set(__property_##__prop_name::type_tag, const decltype(__prop_name)::value_type& value)
+
+#define PROPERTY_GET_SET_DECL(__prop_name) \
+	using __property_has_get_##__prop_name = int; \
+	using __property_has_set_##__prop_name = int; \
+	decltype(__prop_name)::value_type __property_get(__property_##__prop_name::type_tag) const; \
+	void __property_set(__property_##__prop_name::type_tag, const decltype(__prop_name)::value_type& value)
 
 #define PROPERTY_GET_IMPL(__class_name, __prop_name) \
-	decltype(__class_name::__prop_name)::value_type __class_name::__property_##__prop_name##_get() const
+	decltype(__class_name::__prop_name)::value_type __class_name::__property_get(__property_##__prop_name::type_tag) const
 
 #define PROPERTY_SET_IMPL(__class_name, __prop_name) \
-	void __class_name::__property_##__prop_name##_set(const decltype(__class_name::__prop_name)::value_type& value)
+	void __class_name::__property_set(__property_##__prop_name::type_tag, const decltype(__class_name::__prop_name)::value_type& value)
