@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#pragma once
+
 #include <type_traits>
 #include <utility>
 
@@ -94,7 +96,7 @@ namespace priv {
 		constexpr void operator=(const Type& value) { m_value = value; }
 		constexpr void operator=(Type&& value) { m_value = std::move(value); }
 
-		constepxr const Type& cref() const { return m_value; }
+		constexpr const Type& cref() const { return m_value; }
 		constexpr const Type& ref() const { return m_value; }
 		constexpr Type& ref() { return m_value; }
 
